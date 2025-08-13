@@ -3,7 +3,6 @@ import {
   OnInit,
   OnDestroy,
   ChangeDetectorRef,
-  NgZone,
   ChangeDetectionStrategy,
   Input,
   Output,
@@ -33,7 +32,6 @@ export class CountdownTimerComponent implements OnInit, OnDestroy {
 
   http = inject(HttpClient);
   cdr = inject(ChangeDetectorRef);
-  // ngZone = inject(NgZone);
 
   ngOnInit(): void {
     if (this.apiEndpoint) {
@@ -61,9 +59,6 @@ export class CountdownTimerComponent implements OnInit, OnDestroy {
   private startCountdown(): void {
     if (this.secondsLeft === null) return;
 
-    // this.ngZone.runOutsideAngular(() => {
-     
-    // });
      this.intervalId = window.setInterval(() => {
         if (this.secondsLeft && this.secondsLeft > 0) {
           this.secondsLeft--;
