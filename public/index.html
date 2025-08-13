@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <countdown-timer seconds-left="30"></countdown-timer>
+    <script src="./countdown/browser/main.js" type="module"></script>
+    <script src="./countdown/browser/polyfills.js" type="module"></script>
+    <script>
+        const el = document.querySelector('countdown-timer');
+        el.addEventListener('deadlineReached', () => alert('Deadline Reached'))
+    </script>
+</body>
+</html>
