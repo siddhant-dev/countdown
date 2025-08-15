@@ -7,7 +7,6 @@ import { CountdownTimerComponent } from './app/countdown-timer/countdown-timer.c
 enableProdMode();
 
 bootstrapApplication(CountdownTimerComponent, appConfig).then((appRef) => {
-  console.error(appRef);
   const customElement = createCustomElement(CountdownTimerComponent, {
       injector: appRef.injector,
     });

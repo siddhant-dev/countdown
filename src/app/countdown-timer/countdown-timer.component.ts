@@ -10,14 +10,14 @@ import {
   inject,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Subscription } from 'rxjs';
+import { Subscription, interval, of } from 'rxjs';
+import { take, map, catchError } from 'rxjs/operators';
 
 @Component({
   selector: 'countdown-timer',
   standalone: true,
   templateUrl: './countdown-timer.component.html',
   styleUrls: ['./countdown-timer.component.scss'],
-  imports: [],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CountdownTimerComponent implements OnInit, OnDestroy {
@@ -25,8 +25,7 @@ export class CountdownTimerComponent implements OnInit, OnDestroy {
   @Input() apiEndpoint: string | null = null;
   @Output() deadlineReached: EventEmitter<void> = new EventEmitter();
 
-  private intervalId: number | null = null;
-  private apiSubscription: Subscription | null = null;
+  private subs: Subscription = new Subscription();
 
   errorMessage: string | null = null;
 
@@ -34,21 +33,12 @@ export class CountdownTimerComponent implements OnInit, OnDestroy {
   cdr = inject(ChangeDetectorRef);
 
   ngOnInit(): void {
+    this.initializeCountdown();
+  }
+
+  private initializeCountdown(): void {
     if (this.apiEndpoint) {
-      this.apiSubscription = this.http
-        .get<{ secondsLeft: number }>(this.apiEndpoint)
-        .subscribe({
-          next: (response) => {
-            this.secondsLeft = response.secondsLeft;
-            this.startCountdown();
-          },
-          error: (err) => {
-            console.error('Failed to fetch deadline:', err);
-            this.errorMessage =
-              'Failed to fetch API data. Please try again later.';
-            this.secondsLeft = null;
-          },
-        });
+      this.fetchSecondsFromApi();
     } else if (this.secondsLeft !== null) {
       this.startCountdown();
     } else {
@@ -56,31 +46,65 @@ export class CountdownTimerComponent implements OnInit, OnDestroy {
     }
   }
 
-  private startCountdown(): void {
-    if (this.secondsLeft === null) return;
-
-     this.intervalId = window.setInterval(() => {
-        if (this.secondsLeft && this.secondsLeft > 0) {
-          this.secondsLeft--;
-          this.cdr.markForCheck();
+  private fetchSecondsFromApi(): void {
+    this.subs.add(this.http
+      .get<{ secondsLeft: number }>(this.apiEndpoint!)
+      .pipe(
+        catchError((error) => {
+          console.error('Failed to fetch data:', error);
+          this.setErrorMessage('Failed to fetch API data. Please try again later.');
+          return of(null); 
+        })
+      )
+      .subscribe((response) => {
+        if (response?.secondsLeft != null) {
+          this.secondsLeft = response.secondsLeft;
+          this.startCountdown();
         } else {
-          this.stopCountdown();
-          this.deadlineReached.emit();
+          this.setErrorMessage('Invalid API response.');
         }
-      }, 1000);
+      }));
   }
 
-  private stopCountdown(): void {
-    if (this.intervalId !== null) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
+  private startCountdown(): void {
+    if (this.secondsLeft === null || this.secondsLeft <= 0) {
+      this.setErrorMessage('Invalid countdown duration.');
+      return;
     }
+
+    const startingValue = this.secondsLeft!;
+    this.subs.add(interval(1000)
+      .pipe(
+        take(startingValue), 
+        map((elapsed) => startingValue - elapsed - 1) 
+      )
+      .subscribe({
+        next: (remainingSeconds) => {
+          this.updateRemainingSeconds(remainingSeconds);
+        },
+        complete: () => {
+          this.updateRemainingSeconds(0);
+          this.emitDeadlineReached();
+        },
+      }));
+  }
+
+  private updateRemainingSeconds(remainingSeconds: number): void {
+    this.secondsLeft = remainingSeconds;
+    this.cdr.markForCheck(); 
+  }
+
+  private emitDeadlineReached(): void {
+    this.deadlineReached.emit();
+  }
+
+  private setErrorMessage(message: string): void {
+    this.errorMessage = message;
+    this.secondsLeft = null;
+    this.cdr.markForCheck();
   }
 
   ngOnDestroy(): void {
-    this.stopCountdown();
-    if (this.apiSubscription && !this.apiSubscription.closed) {
-      this.apiSubscription.unsubscribe();
-    }
+    this.subs.unsubscribe();
   }
 }
